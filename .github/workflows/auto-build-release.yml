@@ -22,7 +22,6 @@ jobs:
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.24.0'
         channel: 'stable'
         
     - name: Get dependencies
@@ -44,11 +43,6 @@ jobs:
     - name: Build Android AAB
       run: flutter build appbundle --release
       
-    - name: Setup Node.js for Web build
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        
     - name: Build Web
       run: flutter build web --release
       
@@ -82,12 +76,12 @@ jobs:
         - **Android AAB**: For Google Play Store upload
         - **Web App**: Progressive Web Application
 
-        ### 🔧 What's New
+        ### � What'sa New
         - Auto-built from latest main branch
-        - Built with Flutter 3.24.0
+        - Built with latest Flutter stable
         - Package: com.ashish.hidehub
 
-        ### 📋 Installation Instructions
+        ### � Ihnstallation Instructions
 
         **Android APK:**
         1. Download the APK file
