@@ -112,106 +112,108 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // App Icon/Logo
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: Colors.deepPurple,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Icon(
-                  Icons.security,
-                  color: Colors.white,
-                  size: 50,
-                ),
-              ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight:
+                  MediaQuery.of(context).size.height -
+                  MediaQuery.of(context).padding.top -
+                  MediaQuery.of(context).padding.bottom -
+                  32,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(height: 20),
 
-              const SizedBox(height: 32),
-
-              // Title
-              Text(
-                'HideHub',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // Subtitle
-              Text(
-                _isConfirming ? 'Confirm your PIN' : 'Set up your PIN',
-                style: TextStyle(color: Colors.grey[400], fontSize: 18),
-              ),
-
-              const SizedBox(height: 48),
-
-              // PIN Input
-              PinInputWidget(
-                onPinChanged: _onPinChanged,
-                currentPin: _isConfirming ? _confirmPin : _pin,
-              ),
-
-              const SizedBox(height: 48),
-
-              // Biometric option (only show on first setup)
-              if (_biometricAvailable && !_isConfirming) ...[
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[900],
-                    borderRadius: BorderRadius.circular(12),
+                // Title
+                const Text(
+                  'HideHub',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
                   ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        _availableBiometrics.contains(BiometricType.face)
-                            ? Icons.face
-                            : Icons.fingerprint,
-                        color: Colors.deepPurple,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Enable ${_getBiometricTypeText()}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
+                ),
+
+                const SizedBox(height: 12),
+
+                // Subtitle
+                Text(
+                  _isConfirming ? 'Confirm your PIN' : 'Set up your PIN',
+                  style: TextStyle(color: Colors.grey[400], fontSize: 16),
+                ),
+
+                const SizedBox(height: 32),
+
+                // PIN Input
+                PinInputWidget(
+                  onPinChanged: _onPinChanged,
+                  currentPin: _isConfirming ? _confirmPin : _pin,
+                ),
+
+                const SizedBox(height: 32),
+
+                // Biometric option (only show on first setup)
+                if (_biometricAvailable && !_isConfirming) ...[
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[900],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _availableBiometrics.contains(BiometricType.face)
+                              ? Icons.face
+                              : Icons.fingerprint,
+                          color: Colors.deepPurple,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Enable ${_getBiometricTypeText()}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                            ),
                           ),
                         ),
-                      ),
-                      Switch(
-                        value: _enableBiometric,
-                        onChanged: (value) {
-                          setState(() {
-                            _enableBiometric = value;
-                          });
-                        },
-                        activeColor: Colors.deepPurple,
-                      ),
-                    ],
+                        Switch(
+                          value: _enableBiometric,
+                          onChanged: (value) {
+                            setState(() {
+                              _enableBiometric = value;
+                            });
+                          },
+                          activeThumbColor: Colors.deepPurple,
+                          activeTrackColor: Colors.deepPurple.withValues(
+                            alpha: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
+
+                // Instructions
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    _isConfirming
+                        ? 'Re-enter your 4-digit PIN'
+                        : 'Create a 4-digit PIN to secure your app',
+                    style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                    textAlign: TextAlign.center,
                   ),
                 ),
-                const SizedBox(height: 24),
-              ],
 
-              // Instructions
-              Text(
-                _isConfirming
-                    ? 'Re-enter your 4-digit PIN'
-                    : 'Create a 4-digit PIN to secure your app',
-                style: TextStyle(color: Colors.grey[500], fontSize: 14),
-                textAlign: TextAlign.center,
-              ),
-            ],
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
         ),
       ),

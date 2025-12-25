@@ -192,132 +192,138 @@ class _LockScreenState extends State<LockScreen> with WidgetsBindingObserver {
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // App Icon/Logo
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: Colors.deepPurple,
-                  borderRadius: BorderRadius.circular(20),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight:
+                  MediaQuery.of(context).size.height -
+                  MediaQuery.of(context).padding.top -
+                  MediaQuery.of(context).padding.bottom -
+                  32,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(height: 20),
+
+                // Title
+                const Text(
+                  'HideHub',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                child: const Icon(Icons.lock, color: Colors.white, size: 50),
-              ),
 
-              const SizedBox(height: 32),
+                const SizedBox(height: 12),
 
-              // Title
-              const Text(
-                'HideHub',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
+                // Subtitle
+                Text(
+                  _isLocked ? 'App Locked' : 'Enter your PIN',
+                  style: TextStyle(
+                    color: _isLocked ? Colors.red : Colors.grey[400],
+                    fontSize: 16,
+                  ),
                 ),
-              ),
 
-              const SizedBox(height: 16),
+                if (_isLocked && _lockUntil != null) ...[
+                  const SizedBox(height: 8),
+                  StreamBuilder(
+                    stream: Stream.periodic(const Duration(seconds: 1)),
+                    builder: (context, snapshot) {
+                      final remaining = _lockUntil!.difference(DateTime.now());
+                      if (remaining.isNegative) {
+                        return const SizedBox.shrink();
+                      }
+                      return Text(
+                        'Try again in ${remaining.inMinutes}:${(remaining.inSeconds % 60).toString().padLeft(2, '0')}',
+                        style: TextStyle(color: Colors.red[300], fontSize: 14),
+                      );
+                    },
+                  ),
+                ],
 
-              // Subtitle
-              Text(
-                _isLocked ? 'App Locked' : 'Enter your PIN',
-                style: TextStyle(
-                  color: _isLocked ? Colors.red : Colors.grey[400],
-                  fontSize: 18,
+                const SizedBox(height: 32),
+
+                // PIN Input
+                PinInputWidget(
+                  onPinChanged: _onPinChanged,
+                  currentPin: _pin,
+                  enabled: !_isLocked,
                 ),
-              ),
 
-              if (_isLocked && _lockUntil != null) ...[
-                const SizedBox(height: 8),
-                StreamBuilder(
-                  stream: Stream.periodic(const Duration(seconds: 1)),
-                  builder: (context, snapshot) {
-                    final remaining = _lockUntil!.difference(DateTime.now());
-                    if (remaining.isNegative) {
-                      return const SizedBox.shrink();
-                    }
-                    return Text(
-                      'Try again in ${remaining.inMinutes}:${(remaining.inSeconds % 60).toString().padLeft(2, '0')}',
-                      style: TextStyle(color: Colors.red[300], fontSize: 14),
-                    );
-                  },
-                ),
-              ],
+                const SizedBox(height: 32),
 
-              const SizedBox(height: 48),
-
-              // PIN Input
-              PinInputWidget(
-                onPinChanged: _onPinChanged,
-                currentPin: _pin,
-                enabled: !_isLocked,
-              ),
-
-              const SizedBox(height: 48),
-
-              // Biometric button
-              if (_biometricEnabled && _biometricAvailable && !_isLocked) ...[
-                GestureDetector(
-                  onTap: _authenticateWithBiometric,
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[900],
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.deepPurple, width: 1),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(_getBiometricIcon(), color: Colors.deepPurple),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Use ${_getBiometricTypeText()}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
+                // Biometric button
+                if (_biometricEnabled && _biometricAvailable && !_isLocked) ...[
+                  GestureDetector(
+                    onTap: _authenticateWithBiometric,
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[900],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.deepPurple, width: 1),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(_getBiometricIcon(), color: Colors.deepPurple),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Use ${_getBiometricTypeText()}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 24),
-              ],
+                  const SizedBox(height: 20),
+                ],
 
-              // Failed attempts indicator
-              if (_failedAttempts > 0 && !_isLocked) ...[
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
+                // Failed attempts indicator
+                if (_failedAttempts > 0 && !_isLocked) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.red.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Text(
+                      'Failed attempts: $_failedAttempts/5',
+                      style: TextStyle(color: Colors.red[300], fontSize: 12),
+                    ),
                   ),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red.withOpacity(0.3)),
-                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // Instructions
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Text(
-                    'Failed attempts: $_failedAttempts/5',
-                    style: TextStyle(color: Colors.red[300], fontSize: 12),
+                    _isLocked
+                        ? 'App is temporarily locked due to multiple failed attempts'
+                        : 'Enter your 4-digit PIN to unlock',
+                    style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                    textAlign: TextAlign.center,
                   ),
                 ),
-                const SizedBox(height: 16),
-              ],
 
-              // Instructions
-              Text(
-                _isLocked
-                    ? 'App is temporarily locked due to multiple failed attempts'
-                    : 'Enter your 4-digit PIN to unlock',
-                style: TextStyle(color: Colors.grey[500], fontSize: 14),
-                textAlign: TextAlign.center,
-              ),
-            ],
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
         ),
       ),
