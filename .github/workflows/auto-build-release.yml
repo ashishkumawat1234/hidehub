@@ -1,0 +1,113 @@
+name: Auto Build and Release
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+        
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.24.0'
+        channel: 'stable'
+        
+    - name: Get dependencies
+      run: flutter pub get
+      
+    - name: Get version from pubspec.yaml
+      id: get_version
+      run: |
+        VERSION=$(grep '^version:' pubspec.yaml | cut -d ' ' -f 2 | cut -d '+' -f 1)
+        echo "VERSION=v$VERSION" >> $GITHUB_OUTPUT
+        echo "App version: v$VERSION"
+        
+    - name: Run tests
+      run: flutter test
+      
+    - name: Build Android APK
+      run: flutter build apk --release
+      
+    - name: Build Android AAB
+      run: flutter build appbundle --release
+      
+    - name: Setup Node.js for Web build
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
+    - name: Build Web
+      run: flutter build web --release
+      
+    - name: Archive Web Build
+      run: |
+        cd build/web
+        zip -r ../../hidehub-web.zip .
+        
+    - name: Check if release exists
+      id: check_release
+      run: |
+        if gh release view ${{ steps.get_version.outputs.VERSION }} >/dev/null 2>&1; then
+          echo "EXISTS=true" >> $GITHUB_OUTPUT
+          echo "Release ${{ steps.get_version.outputs.VERSION }} already exists, deleting..."
+          gh release delete ${{ steps.get_version.outputs.VERSION }} --yes
+        else
+          echo "EXISTS=false" >> $GITHUB_OUTPUT
+        fi
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Create Release
+      id: create_release
+      run: |
+        gh release create ${{ steps.get_version.outputs.VERSION }} \
+          --title "HideHub ${{ steps.get_version.outputs.VERSION }}" \
+          --notes "## 🚀 HideHub Release ${{ steps.get_version.outputs.VERSION }}
+
+        ### 📱 Downloads Available
+        - **Android APK**: Direct install on Android devices
+        - **Android AAB**: For Google Play Store upload
+        - **Web App**: Progressive Web Application
+
+        ### 🔧 What's New
+        - Auto-built from latest main branch
+        - Built with Flutter 3.24.0
+        - Package: com.ashish.hidehub
+
+        ### 📋 Installation Instructions
+
+        **Android APK:**
+        1. Download the APK file
+        2. Enable 'Install from unknown sources' in device settings
+        3. Install the APK
+
+        **Web App:**
+        1. Download and extract the web build
+        2. Serve using any web server or open index.html
+
+        ---
+        *Auto-generated release • Built on $(date)*" \
+          build/app/outputs/flutter-apk/app-release.apk#hidehub-${{ steps.get_version.outputs.VERSION }}-android.apk \
+          build/app/outputs/bundle/release/app-release.aab#hidehub-${{ steps.get_version.outputs.VERSION }}-android.aab \
+          hidehub-web.zip#hidehub-${{ steps.get_version.outputs.VERSION }}-web.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Success Message
+      run: |
+        echo "✅ Build and Release completed successfully!"
+        echo "🚀 Release ${{ steps.get_version.outputs.VERSION }} is now available"
+        echo "📱 Download links: https://github.com/${{ github.repository }}/releases/tag/${{ steps.get_version.outputs.VERSION }}"
