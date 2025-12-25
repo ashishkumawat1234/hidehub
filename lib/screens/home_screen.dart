@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/hidden_files_service.dart';
@@ -449,7 +448,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       'Auto-lock on Background',
                     ),
                     _buildFeatureItem(Icons.block, 'Failed Attempt Protection'),
-                    _buildFeatureItem(Icons.encrypted, 'Secure File Storage'),
+                    _buildFeatureItem(Icons.lock, 'Secure File Storage'),
                   ],
                 ),
               ),

@@ -197,7 +197,11 @@ class HiddenFilesService {
   // Get total size of hidden files
   Future<int> getTotalHiddenSize() async {
     final files = await getHiddenFiles();
-    return files.fold(0, (sum, file) => sum + file.size);
+    int totalSize = 0;
+    for (final file in files) {
+      totalSize += file.size;
+    }
+    return totalSize;
   }
 
   // Clear all hidden files

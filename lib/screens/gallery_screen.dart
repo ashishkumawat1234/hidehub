@@ -47,15 +47,10 @@ class _GalleryScreenState extends State<GalleryScreen>
 
   Future<bool> _requestPermission() async {
     if (Platform.isAndroid) {
-      final androidInfo = await PhotoManager.getAndroidVersion();
-      if (androidInfo >= 33) {
-        final photos = await Permission.photos.request();
-        final videos = await Permission.videos.request();
-        return photos.isGranted && videos.isGranted;
-      } else {
-        final storage = await Permission.storage.request();
-        return storage.isGranted;
-      }
+      // For Android 13+ (API 33+), we need specific media permissions
+      final photos = await Permission.photos.request();
+      final videos = await Permission.videos.request();
+      return photos.isGranted && videos.isGranted;
     } else {
       final photos = await Permission.photos.request();
       return photos.isGranted;
@@ -132,12 +127,14 @@ class _GalleryScreenState extends State<GalleryScreen>
 
     Navigator.of(context).pop(); // Close loading dialog
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Successfully hidden $successCount files'),
-        backgroundColor: Colors.green,
-      ),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Successfully hidden $successCount files'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
 
     setState(() {
       _selectedMedia.clear();
@@ -241,11 +238,7 @@ class _GalleryScreenState extends State<GalleryScreen>
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(
-                    Icons.permission_denied,
-                    size: 64,
-                    color: Colors.grey,
-                  ),
+                  Icon(Icons.block, size: 64, color: Colors.grey),
                   const SizedBox(height: 16),
                   const Text(
                     'Permission Required',
