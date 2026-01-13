@@ -7,6 +7,8 @@ class HiddenFileItem extends StatefulWidget {
   final bool isSelected;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
+  final Function(HiddenFile)? onUnhide;
+  final Function(HiddenFile)? onDelete;
 
   const HiddenFileItem({
     super.key,
@@ -14,6 +16,8 @@ class HiddenFileItem extends StatefulWidget {
     required this.isSelected,
     required this.onTap,
     required this.onLongPress,
+    this.onUnhide,
+    this.onDelete,
   });
 
   @override
@@ -42,8 +46,9 @@ class _HiddenFileItemState extends State<HiddenFileItem> {
   String _formatFileSize(int bytes) {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024)
+    if (bytes < 1024 * 1024 * 1024) {
       return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
 
@@ -129,7 +134,7 @@ class _HiddenFileItemState extends State<HiddenFileItem> {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.7),
+                          color: Colors.black.withValues(alpha: 0.7),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Row(
@@ -177,15 +182,71 @@ class _HiddenFileItemState extends State<HiddenFileItem> {
                         ),
                       ),
 
-                    // Selection overlay
-                    if (widget.isSelected)
-                      Container(
-                        decoration: BoxDecoration(
-                          borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(12),
-                            topRight: Radius.circular(12),
+                    // More options button (only show when not selected)
+                    if (!widget.isSelected)
+                      Positioned(
+                        bottom: 8,
+                        right: 8,
+                        child: PopupMenuButton<String>(
+                          icon: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.7),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.more_vert,
+                              color: Colors.white,
+                              size: 16,
+                            ),
                           ),
-                          color: Colors.deepPurple.withOpacity(0.3),
+                          color: Colors.grey[800],
+                          onSelected: (value) {
+                            switch (value) {
+                              case 'unhide':
+                                widget.onUnhide?.call(widget.hiddenFile);
+                                break;
+                              case 'delete':
+                                widget.onDelete?.call(widget.hiddenFile);
+                                break;
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(
+                              value: 'unhide',
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.visibility,
+                                    color: Colors.green,
+                                    size: 18,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Unhide',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.delete,
+                                    color: Colors.red,
+                                    size: 18,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Delete',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                   ],

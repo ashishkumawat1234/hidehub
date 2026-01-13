@@ -16,10 +16,17 @@ class _GalleryScreenState extends State<GalleryScreen>
     with TickerProviderStateMixin {
   final HiddenFilesService _hiddenFilesService = HiddenFilesService();
   List<AssetEntity> _mediaList = [];
-  List<AssetEntity> _selectedMedia = [];
+  final List<AssetEntity> _selectedMedia = [];
+  List<HiddenFile> _hiddenFiles = []; // Store hidden files for comparison
   bool _isLoading = true;
   bool _hasPermission = false;
   late TabController _tabController;
+
+  // Sorting options
+  String _sortBy = 'newest'; // newest, oldest, name, size
+  bool _showSortPanel = false;
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -31,6 +38,7 @@ class _GalleryScreenState extends State<GalleryScreen>
   @override
   void dispose() {
     _tabController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -70,8 +78,12 @@ class _GalleryScreenState extends State<GalleryScreen>
         end: 1000, // Load first 1000 items
       );
 
+      // Load hidden files to filter them out
+      final hiddenFiles = await _hiddenFilesService.getHiddenFiles();
+
       setState(() {
         _mediaList = media;
+        _hiddenFiles = hiddenFiles;
       });
     }
   }
@@ -139,11 +151,200 @@ class _GalleryScreenState extends State<GalleryScreen>
     setState(() {
       _selectedMedia.clear();
     });
+
+    // Reload hidden files to update the filter
+    final hiddenFiles = await _hiddenFilesService.getHiddenFiles();
+    setState(() {
+      _hiddenFiles = hiddenFiles;
+    });
   }
 
-  List<AssetEntity> _getFilteredMedia(AssetType type) {
-    if (type == AssetType.other) return _mediaList; // All media
-    return _mediaList.where((asset) => asset.type == type).toList();
+  Future<List<AssetEntity>> _getSortedMedia(AssetType type) async {
+    List<AssetEntity> filtered = _mediaList;
+
+    // Filter by type
+    if (type != AssetType.other) {
+      filtered = filtered.where((asset) => asset.type == type).toList();
+    }
+
+    // Filter out already hidden files (check by filename and size)
+    List<AssetEntity> notHiddenFiles = [];
+    for (final asset in filtered) {
+      final file = await asset.file;
+      if (file != null) {
+        final fileName = file.path.split('/').last;
+        final fileSize = await file.length();
+
+        // Check if this file is already hidden by comparing name and size
+        bool isAlreadyHidden = _hiddenFiles.any(
+          (hiddenFile) =>
+              hiddenFile.originalName == fileName &&
+              hiddenFile.size == fileSize,
+        );
+
+        if (!isAlreadyHidden) {
+          notHiddenFiles.add(asset);
+        }
+      }
+    }
+    filtered = notHiddenFiles;
+
+    // Filter by search query
+    if (_searchQuery.isNotEmpty) {
+      filtered = filtered
+          .where(
+            (asset) => (asset.title ?? '').toLowerCase().contains(
+              _searchQuery.toLowerCase(),
+            ),
+          )
+          .toList();
+    }
+
+    // Sort media
+    switch (_sortBy) {
+      case 'newest':
+        filtered.sort((a, b) => b.createDateTime.compareTo(a.createDateTime));
+        break;
+      case 'oldest':
+        filtered.sort((a, b) => a.createDateTime.compareTo(b.createDateTime));
+        break;
+      case 'name':
+        filtered.sort((a, b) => (a.title ?? '').compareTo(b.title ?? ''));
+        break;
+      case 'size':
+        // Sort by file size - we need to get the actual file size
+        filtered.sort((a, b) {
+          // For AssetEntity, we can use width * height as a proxy for size
+          // or we could load the file and get actual byte size, but that's expensive
+          final aSize = (a.width * a.height);
+          final bSize = (b.width * b.height);
+          return bSize.compareTo(aSize);
+        });
+        break;
+    }
+
+    return filtered;
+  }
+
+  Widget _buildSortPanel() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[900],
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(16),
+          bottomRight: Radius.circular(16),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Search bar
+          TextField(
+            controller: _searchController,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: 'Search by filename...',
+              hintStyle: const TextStyle(color: Colors.grey),
+              prefixIcon: const Icon(Icons.search, color: Colors.grey),
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, color: Colors.grey),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() {
+                          _searchQuery = '';
+                        });
+                      },
+                    )
+                  : null,
+              filled: true,
+              fillColor: Colors.grey[800],
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide.none,
+              ),
+            ),
+            onChanged: (value) {
+              setState(() {
+                _searchQuery = value;
+              });
+            },
+          ),
+          const SizedBox(height: 16),
+
+          // Sort options
+          const Text(
+            'Sort by',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: [
+              _buildSortChip('Newest', 'newest'),
+              _buildSortChip('Oldest', 'oldest'),
+              _buildSortChip('Name', 'name'),
+              _buildSortChip('Size', 'size'),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Action buttons
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _sortBy = 'newest';
+                    _searchQuery = '';
+                    _searchController.clear();
+                  });
+                },
+                child: const Text(
+                  'Reset',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _showSortPanel = false;
+                  });
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepPurple,
+                ),
+                child: const Text('Apply'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSortChip(String label, String value) {
+    final isSelected = _sortBy == value;
+    return FilterChip(
+      label: Text(
+        label,
+        style: TextStyle(
+          color: isSelected ? Colors.white : Colors.grey,
+          fontSize: 12,
+        ),
+      ),
+      selected: isSelected,
+      onSelected: (selected) {
+        setState(() {
+          _sortBy = value;
+        });
+      },
+      backgroundColor: Colors.grey[800],
+      selectedColor: Colors.deepPurple,
+      checkmarkColor: Colors.white,
+    );
   }
 
   Widget _buildMediaGrid(List<AssetEntity> media) {
@@ -184,6 +385,31 @@ class _GalleryScreenState extends State<GalleryScreen>
     );
   }
 
+  Widget _buildAsyncMediaGrid(AssetType type) {
+    return FutureBuilder<List<AssetEntity>>(
+      future: _getSortedMedia(type),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(color: Colors.deepPurple),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return const Center(
+            child: Text(
+              'Error loading media',
+              style: TextStyle(color: Colors.red),
+            ),
+          );
+        }
+
+        final media = snapshot.data ?? [];
+        return _buildMediaGrid(media);
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -201,6 +427,18 @@ class _GalleryScreenState extends State<GalleryScreen>
           icon: const Icon(Icons.arrow_back, color: Colors.white),
         ),
         actions: [
+          IconButton(
+            onPressed: () {
+              setState(() {
+                _showSortPanel = !_showSortPanel;
+              });
+            },
+            icon: Icon(
+              Icons.sort,
+              color: _showSortPanel ? Colors.deepPurple : Colors.white,
+            ),
+            tooltip: 'Sort',
+          ),
           if (_selectedMedia.isNotEmpty)
             IconButton(
               onPressed: _hideSelectedMedia,
@@ -265,12 +503,57 @@ class _GalleryScreenState extends State<GalleryScreen>
                 ],
               ),
             )
-          : TabBarView(
-              controller: _tabController,
+          : Column(
               children: [
-                _buildMediaGrid(_getFilteredMedia(AssetType.other)),
-                _buildMediaGrid(_getFilteredMedia(AssetType.image)),
-                _buildMediaGrid(_getFilteredMedia(AssetType.video)),
+                // Sort panel
+                if (_showSortPanel) _buildSortPanel(),
+
+                // Media count and info
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  color: Colors.grey[850],
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      FutureBuilder<List<AssetEntity>>(
+                        future: _getSortedMedia(AssetType.other),
+                        builder: (context, snapshot) {
+                          final count = snapshot.data?.length ?? 0;
+                          return Text(
+                            '$count items',
+                            style: const TextStyle(
+                              color: Colors.grey,
+                              fontSize: 12,
+                            ),
+                          );
+                        },
+                      ),
+                      if (_sortBy != 'newest' || _searchQuery.isNotEmpty)
+                        const Text(
+                          'Sorted',
+                          style: TextStyle(
+                            color: Colors.deepPurple,
+                            fontSize: 12,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+
+                // Tab content
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildAsyncMediaGrid(AssetType.other),
+                      _buildAsyncMediaGrid(AssetType.image),
+                      _buildAsyncMediaGrid(AssetType.video),
+                    ],
+                  ),
+                ),
               ],
             ),
       floatingActionButton: _selectedMedia.isNotEmpty

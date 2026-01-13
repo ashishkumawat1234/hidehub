@@ -16,7 +16,7 @@ class _HiddenFilesScreenState extends State<HiddenFilesScreen>
     with TickerProviderStateMixin {
   final HiddenFilesService _hiddenFilesService = HiddenFilesService();
   List<HiddenFile> _hiddenFiles = [];
-  List<HiddenFile> _selectedFiles = [];
+  final List<HiddenFile> _selectedFiles = [];
   bool _isLoading = true;
   late TabController _tabController;
 
@@ -49,6 +49,85 @@ class _HiddenFilesScreenState extends State<HiddenFilesScreen>
         _selectedFiles.add(file);
       }
     });
+  }
+
+  Future<void> _unhideSelectedFiles() async {
+    if (_selectedFiles.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        title: const Text(
+          'Unhide Files',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: Text(
+          'Are you sure you want to unhide ${_selectedFiles.length} files? They will be restored to your Downloads folder.',
+          style: const TextStyle(color: Colors.grey),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Unhide', style: TextStyle(color: Colors.green)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    // Show loading dialog
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        title: const Text(
+          'Unhiding Files...',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(color: Colors.deepPurple),
+            const SizedBox(height: 16),
+            Text(
+              'Restoring ${_selectedFiles.length} files',
+              style: const TextStyle(color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    int successCount = 0;
+    for (final file in _selectedFiles) {
+      final success = await _hiddenFilesService.restoreFile(file);
+      if (success) successCount++;
+    }
+
+    if (!mounted) return;
+    Navigator.of(context).pop(); // Close loading dialog
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Successfully unhidden $successCount files'),
+        backgroundColor: Colors.green,
+      ),
+    );
+
+    setState(() {
+      _selectedFiles.clear();
+    });
+
+    await _loadHiddenFiles(); // Reload the list
   }
 
   Future<void> _deleteSelectedFiles() async {
@@ -172,9 +251,95 @@ class _HiddenFilesScreenState extends State<HiddenFilesScreen>
           isSelected: isSelected,
           onTap: () => _toggleSelection(file),
           onLongPress: () => _viewFile(file),
+          onUnhide: (hiddenFile) => _unhideSingleFile(hiddenFile),
+          onDelete: (hiddenFile) => _deleteSingleFile(hiddenFile),
         );
       },
     );
+  }
+
+  Future<void> _unhideSingleFile(HiddenFile file) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        title: const Text('Unhide File', style: TextStyle(color: Colors.white)),
+        content: Text(
+          'Unhide "${file.originalName}"? It will be restored to your Downloads folder.',
+          style: const TextStyle(color: Colors.grey),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Unhide', style: TextStyle(color: Colors.green)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final success = await _hiddenFilesService.restoreFile(file);
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          success ? 'File unhidden successfully' : 'Failed to unhide file',
+        ),
+        backgroundColor: success ? Colors.green : Colors.red,
+      ),
+    );
+
+    if (success) {
+      await _loadHiddenFiles();
+    }
+  }
+
+  Future<void> _deleteSingleFile(HiddenFile file) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        title: const Text('Delete File', style: TextStyle(color: Colors.white)),
+        content: Text(
+          'Permanently delete "${file.originalName}"? This action cannot be undone.',
+          style: const TextStyle(color: Colors.grey),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final success = await _hiddenFilesService.deleteHiddenFile(file);
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          success ? 'File deleted successfully' : 'Failed to delete file',
+        ),
+        backgroundColor: success ? Colors.green : Colors.red,
+      ),
+    );
+
+    if (success) {
+      await _loadHiddenFiles();
+    }
   }
 
   void _viewFile(HiddenFile file) {
@@ -202,12 +367,18 @@ class _HiddenFilesScreenState extends State<HiddenFilesScreen>
           icon: const Icon(Icons.arrow_back, color: Colors.white),
         ),
         actions: [
-          if (_selectedFiles.isNotEmpty)
+          if (_selectedFiles.isNotEmpty) ...[
+            IconButton(
+              onPressed: _unhideSelectedFiles,
+              icon: const Icon(Icons.visibility, color: Colors.green),
+              tooltip: 'Unhide Selected',
+            ),
             IconButton(
               onPressed: _deleteSelectedFiles,
               icon: const Icon(Icons.delete, color: Colors.red),
               tooltip: 'Delete Selected',
             ),
+          ],
           IconButton(
             onPressed: () {
               setState(() {
@@ -252,11 +423,25 @@ class _HiddenFilesScreenState extends State<HiddenFilesScreen>
               ],
             ),
       floatingActionButton: _selectedFiles.isNotEmpty
-          ? FloatingActionButton.extended(
-              onPressed: _deleteSelectedFiles,
-              backgroundColor: Colors.red,
-              icon: const Icon(Icons.delete),
-              label: Text('Delete ${_selectedFiles.length}'),
+          ? Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                FloatingActionButton.extended(
+                  onPressed: _unhideSelectedFiles,
+                  backgroundColor: Colors.green,
+                  heroTag: "unhide",
+                  icon: const Icon(Icons.visibility),
+                  label: Text('Unhide ${_selectedFiles.length}'),
+                ),
+                const SizedBox(width: 16),
+                FloatingActionButton.extended(
+                  onPressed: _deleteSelectedFiles,
+                  backgroundColor: Colors.red,
+                  heroTag: "delete",
+                  icon: const Icon(Icons.delete),
+                  label: Text('Delete ${_selectedFiles.length}'),
+                ),
+              ],
             )
           : null,
     );

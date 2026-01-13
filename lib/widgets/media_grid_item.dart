@@ -123,7 +123,7 @@ class MediaGridItem extends StatelessWidget {
     final remainingSeconds = duration.inSeconds % 60;
 
     if (minutes > 0) {
-      return '${minutes}:${remainingSeconds.toString().padLeft(2, '0')}';
+      return '$minutes:${remainingSeconds.toString().padLeft(2, '0')}';
     } else {
       return '0:${remainingSeconds.toString().padLeft(2, '0')}';
     }

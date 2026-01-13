@@ -137,15 +137,37 @@ class HiddenFilesService {
     return allFiles.where((file) => file.type == type).toList();
   }
 
-  // Restore a hidden file (copy back to gallery)
+  // Restore a hidden file (copy back to Downloads folder and remove from hidden)
   Future<bool> restoreFile(HiddenFile hiddenFile) async {
     try {
       final hiddenFileObj = File(hiddenFile.hiddenPath);
       if (!await hiddenFileObj.exists()) return false;
 
-      // For now, we'll just delete from hidden location
-      // In a real app, you'd copy back to gallery
+      // Get Downloads directory
+      final downloadsDir = Directory('/storage/emulated/0/Download');
+      if (!await downloadsDir.exists()) {
+        await downloadsDir.create(recursive: true);
+      }
+
+      // Create unique filename if file already exists
+      String restoredFileName = hiddenFile.originalName;
+      String restoredPath = '${downloadsDir.path}/$restoredFileName';
+      int counter = 1;
+
+      while (await File(restoredPath).exists()) {
+        final nameWithoutExt = hiddenFile.originalName.split('.').first;
+        final extension = hiddenFile.originalName.split('.').last;
+        restoredFileName = '${nameWithoutExt}_$counter.$extension';
+        restoredPath = '${downloadsDir.path}/$restoredFileName';
+        counter++;
+      }
+
+      // Copy file back to Downloads
+      await hiddenFileObj.copy(restoredPath);
+
+      // Remove from hidden files
       await deleteHiddenFile(hiddenFile);
+
       return true;
     } catch (e) {
       return false;
